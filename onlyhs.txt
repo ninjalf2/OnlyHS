@@ -1,0 +1,22 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.2.0"
+		}
+		
+		"Notes"	"Added Team Fortress 2 Support ( not tested )"
+		"Notes"	"Added Day of Defeat: Source Support ( not tested )"
+		"Notes"	"Added Grenade Damage Support"
+		"Notes"	"Added Melee Damage Support"
+		"Notes"	"Added World Damage Support ( not tested )"
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/onlyhs.smx"
+		"Source"	"Path_SM/scripting/onlyhs.sp"
+	}
+}
