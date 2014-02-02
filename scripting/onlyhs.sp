@@ -9,7 +9,7 @@
 #undef REQUIRE_PLUGIN
 #include <updater>
 
-#define ONLYHS_VERSION "1.3.0"
+#define ONLYHS_VERSION "1.3.1"
 
 #define UPDATE_URL    "http://update.bara.in/onlyhs.txt"
 
@@ -50,7 +50,7 @@ public OnPluginStart()
 
 	g_hEnablePlugin = AutoExecConfig_CreateConVar("onlyhs_enable", "1", "Enable / Disalbe Only HeadShot Plugin", _, true, 0.0, true, 1.0);
 	g_hEnableOneShot = AutoExecConfig_CreateConVar("onlyhs_oneshot", "0", "Enable / Disable kill enemy with one shot", _, true, 0.0, true, 1.0);
-	g_hEnableWeapon = AutoExecConfig_CreateConVar("onlyhs_allow_oneweapon", "1", "Enable / Disalbe Only One Weapon Damage", _, true, 0.0, true, 1.0);
+	g_hEnableWeapon = AutoExecConfig_CreateConVar("onlyhs_oneweapon", "1", "Enable / Disalbe Only One Weapon Damage", _, true, 0.0, true, 1.0);
 	g_hAllowGrenade = AutoExecConfig_CreateConVar("onlyhs_allow_grenade", "0", "Enable / Disalbe Grenade Damage", _, true, 0.0, true, 1.0);
 	g_hAllowWorld = AutoExecConfig_CreateConVar("onlyhs_allow_world", "0", "Enable / Disalbe World Damage", _, true, 0.0, true, 1.0);
 	g_hAllowMelee = AutoExecConfig_CreateConVar("onlyhs_allow_knife", "0", "Enable / Disalbe Knife Damage", _, true, 0.0, true, 1.0);
@@ -73,17 +73,6 @@ public OnPluginStart()
 	}
 }
 
-public OnPluginEnd()
-{
-	for(new i = 1; i <= MaxClients; i++)
-	{
-		if(IsClientValid(i))
-		{
-			SDKUnhook(i, SDKHook_OnTakeDamage, OnTakeDamage);
-		}
-	}
-}
-
 public OnLibraryAdded(const String:name[])
 {
 	if (StrEqual(name, "updater"))
@@ -97,18 +86,13 @@ public OnClientPutInServer(i)
 	SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 }
 
-public OnClientDisconnect(i)
-{
-	SDKUnhook(i, SDKHook_OnTakeDamage, OnTakeDamage);
-}
-
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype, &weapon, Float:damageForce[3], Float:damagePosition[3])
 {
 	if(GetConVarInt(g_hEnablePlugin))
 	{
 		if(IsClientValid(victim))
 		{
-			if(damagetype & DMG_FALL)
+			if(damagetype & DMG_FALL || attacker == 0)
 			{
 				if(GetConVarInt(g_hAllowWorld))
 				{
