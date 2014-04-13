@@ -6,10 +6,10 @@
 
 #include <autoexecconfig>
 
-/*#undef REQUIRE_PLUGIN
-#include <updater> */
+#undef REQUIRE_PLUGIN
+// #include <updater>
 
-#define ONLYHS_VERSION "1.4.1"
+#define ONLYHS_VERSION "1.4.2"
 
 #define UPDATE_URL    "https://bara.in/update/onlyhs.txt"
 
@@ -17,18 +17,19 @@
 
 new Handle:g_hEnablePlugin = INVALID_HANDLE,
 	Handle:g_hEnableOneShot = INVALID_HANDLE,
-	Handle:g_hEnableWeapon = INVALID_HANDLE,
+	Handle:g_hEnableWeapons = INVALID_HANDLE,
 	Handle:g_hAllowGrenade = INVALID_HANDLE,
 	Handle:g_hAllowWorld = INVALID_HANDLE,
 	Handle:g_hAllowMelee = INVALID_HANDLE,
-	Handle:g_hAllowedWeapon = INVALID_HANDLE,
+	Handle:g_hAllowedWeapons = INVALID_HANDLE,
 	Handle:g_hEnableBloodSplatter = INVALID_HANDLE,
 	Handle:g_hEnableBloodSplash = INVALID_HANDLE,
 	Handle:g_hEnableNoBlood = INVALID_HANDLE;
 
-new String:g_sAllowedWeapon[32],
+new String:g_sAllowedWeapons[256],
 	String:g_sGrenade[32],
 	String:g_sWeapon[32];
+
 
 public Plugin:myinfo = 
 {
@@ -41,12 +42,12 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-	CreateConVar("onlyhs_version", ONLYHS_VERSION, "Only Headshot", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-
 	if(GetEngineVersion() != Engine_CSS && GetEngineVersion() != Engine_CSGO)
 	{
 		SetFailState("Only CSS and CSGO Support");
 	}
+
+	CreateConVar("onlyhs_version", ONLYHS_VERSION, "Only Headshot", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
 	LoadTranslations("common.phrases");
 
@@ -55,11 +56,11 @@ public OnPluginStart()
 
 	g_hEnablePlugin = AutoExecConfig_CreateConVar("onlyhs_enable", "1", "Enable / Disalbe Only HeadShot Plugin", _, true, 0.0, true, 1.0);
 	g_hEnableOneShot = AutoExecConfig_CreateConVar("onlyhs_oneshot", "0", "Enable / Disable kill enemy with one shot", _, true, 0.0, true, 1.0);
-	g_hEnableWeapon = AutoExecConfig_CreateConVar("onlyhs_oneweapon", "1", "Enable / Disalbe Only One Weapon Damage", _, true, 0.0, true, 1.0);
+	g_hEnableWeapons = AutoExecConfig_CreateConVar("onlyhs_oneweapon", "1", "Enable / Disalbe certain weapons damage ( see: onlyhs_allow_weapon )", _, true, 0.0, true, 1.0);
 	g_hAllowGrenade = AutoExecConfig_CreateConVar("onlyhs_allow_grenade", "0", "Enable / Disalbe No Grenade Damage", _, true, 0.0, true, 1.0);
 	g_hAllowWorld = AutoExecConfig_CreateConVar("onlyhs_allow_world", "0", "Enable / Disalbe No World Damage", _, true, 0.0, true, 1.0);
 	g_hAllowMelee = AutoExecConfig_CreateConVar("onlyhs_allow_knife", "0", "Enable / Disalbe No Knife Damage", _, true, 0.0, true, 1.0);
-	g_hAllowedWeapon = AutoExecConfig_CreateConVar("onlyhs_allow_weapon", "deagle", "Which weapon should be permitted ( Without 'weapon_' )?");
+	g_hAllowedWeapons = AutoExecConfig_CreateConVar("onlyhs_allow_weapon", "deagle,elite", "Which weapon should be permitted ( Without 'weapon_' )?");
 	g_hEnableNoBlood = AutoExecConfig_CreateConVar("onlyhs_allow_blood", "0", "Enable / Disable No Blood", _, true, 0.0, true, 1.0);
 	g_hEnableBloodSplatter = AutoExecConfig_CreateConVar("onlyhs_allow_blood_splatter", "0", "Enable / Disable No Blood Splatter", _, true, 0.0, true, 1.0);
 	g_hEnableBloodSplash = AutoExecConfig_CreateConVar("onlyhs_allow_blood_splash", "0", "Enable / Disable No Blood Splash", _, true, 0.0, true, 1.0);
@@ -78,19 +79,19 @@ public OnPluginStart()
 		}
 	}
 
-	/* if (LibraryExists("updater"))
+	if (LibraryExists("updater"))
 	{
-		Updater_AddPlugin(UPDATE_URL);
-	} */
+		// Updater_AddPlugin(UPDATE_URL);
+	}
 }
 
-/* public OnLibraryAdded(const String:name[])
+public OnLibraryAdded(const String:name[])
 {
 	if (StrEqual(name, "updater"))
 	{
-		Updater_AddPlugin(UPDATE_URL);
+		// Updater_AddPlugin(UPDATE_URL);
 	}
-} */
+}
 
 public OnClientPutInServer(i)
 {
@@ -122,14 +123,17 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 
 				if(damagetype & DMG_HEADSHOT)
 				{
-					if(GetConVarInt(g_hEnableWeapon))
+					if(GetConVarInt(g_hEnableWeapons))
 					{
-						GetConVarString(g_hAllowedWeapon, g_sAllowedWeapon, sizeof(g_sAllowedWeapon));
+						g_sAllowedWeapons[0] = '\0';
+						GetConVarString(g_hAllowedWeapons, g_sAllowedWeapons, sizeof(g_sAllowedWeapons));
 
-						if(!StrEqual(g_sWeapon[7], g_sAllowedWeapon))
+						if(StrContains(g_sAllowedWeapons, g_sWeapon[7], false) != -1)
 						{
-							return Plugin_Handled;
+							return Plugin_Continue;
 						}
+
+						return Plugin_Handled;
 					}
 
 					if(GetConVarInt(g_hEnableOneShot))
@@ -192,6 +196,7 @@ public Action:TE_OnEffectDispatch(const String:te_name[], const Players[], numCl
 	new iEffectIndex = TE_ReadNum("m_iEffectName");
 	new nHitBox = TE_ReadNum("m_nHitBox");
 	new String:sEffectName[64];
+
 	GetEffectName(iEffectIndex, sEffectName, sizeof(sEffectName));
 	
 	if(GetConVarInt(g_hEnableNoBlood))
@@ -203,7 +208,6 @@ public Action:TE_OnEffectDispatch(const String:te_name[], const Players[], numCl
 				return Plugin_Handled;
 			}
 		}
-
 		if(StrEqual(sEffectName, "ParticleEffect"))
 		{
 			if(GetConVarInt(g_hEnableBloodSplash))
@@ -224,9 +228,10 @@ public Action:TE_OnEffectDispatch(const String:te_name[], const Players[], numCl
 public Action:TE_OnWorldDecal(const String:te_name[], const Players[], numClients, Float:delay)
 {
 	new Float:vecOrigin[3];
-	TE_ReadVector("m_vecOrigin", vecOrigin);
 	new nIndex = TE_ReadNum("m_nIndex");
 	new String:sDecalName[64];
+
+	TE_ReadVector("m_vecOrigin", vecOrigin);
 	GetDecalName(nIndex, sDecalName, sizeof(sDecalName));
 	
 	if(GetConVarInt(g_hEnableNoBlood))
@@ -249,6 +254,7 @@ stock bool:IsClientValid(client)
 	{
 		return true;
 	}
+
 	return false;
 }
 
