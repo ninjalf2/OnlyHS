@@ -9,7 +9,7 @@
 #undef REQUIRE_PLUGIN
 // #include <updater>
 
-#define ONLYHS_VERSION "1.4.2"
+#define ONLYHS_VERSION "1.4.3"
 
 #define UPDATE_URL    "https://bara.in/update/onlyhs.txt"
 
