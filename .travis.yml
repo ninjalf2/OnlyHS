@@ -26,3 +26,10 @@ before_script:
 script:
   - ./spcomp onlyhs.sp
   - ./spcomp onlyhs-beta.sp
+
+notifications:
+  email: 
+    recipients:
+      - webmaster@bara.in
+    on_success: always
+    on_failure: always
