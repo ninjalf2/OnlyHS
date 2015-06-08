@@ -3,184 +3,212 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <cstrike>
 
-#include <autoexecconfig>
+#pragma newdecls required
 
-#undef REQUIRE_PLUGIN
-#include <updater>
+#define ONLYHS_VERSION "2.0.0"
 
-#define ONLYHS_VERSION "1.3.2"
+ConVar g_cEnablePlugin = null;
+ConVar g_cEnableOneShot = null;
+ConVar g_cAllowGrenade = null;
+ConVar g_cAllowWorld = null;
+ConVar g_cAllowKnife = null;
+ConVar g_cAllowedWeapons = null;
+ConVar g_cEnableBloodSplatter = null;
+ConVar g_cEnableBloodSplash = null;
+ConVar g_cEnableNoBlood = null;
 
-#define UPDATE_URL    "https://bara.in/update/onlyhs.txt"
-
-#define DMG_HEADSHOT (1 << 30)
-
-new Handle:g_hEnablePlugin = INVALID_HANDLE,
-	Handle:g_hEnableOneShot = INVALID_HANDLE,
-	Handle:g_hEnableWeapon = INVALID_HANDLE,
-	Handle:g_hAllowGrenade = INVALID_HANDLE,
-	Handle:g_hAllowWorld = INVALID_HANDLE,
-	Handle:g_hAllowMelee = INVALID_HANDLE,
-	Handle:g_hAllowedWeapon = INVALID_HANDLE;
-
-new String:g_sAllowedWeapon[32],
-	String:g_sGrenade[32],
-	String:g_sWeapon[32];
-
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
-	name = "Headshot Only",
+	name = "Only Headshot",
 	author = "Bara",
 	description = "Only Headshot Plugin for CSS and CSGO",
 	version = ONLYHS_VERSION,
 	url = "www.bara.in"
 }
 
-public OnPluginStart()
+public void OnPluginStart()
 {
-	CreateConVar("onlyhs_version", ONLYHS_VERSION, "Only Headshot", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-
 	if(GetEngineVersion() != Engine_CSS && GetEngineVersion() != Engine_CSGO)
 	{
 		SetFailState("Only CSS and CSGO Support");
 	}
 
-	AutoExecConfig_SetFile("plugin.onlyhs", "sourcemod");
-	AutoExecConfig_SetCreateFile(true);
+	CreateConVar("onlyhs_version", ONLYHS_VERSION, "Only Headshot", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
-	g_hEnablePlugin = AutoExecConfig_CreateConVar("onlyhs_enable", "1", "Enable / Disalbe Only HeadShot Plugin", _, true, 0.0, true, 1.0);
-	g_hEnableOneShot = AutoExecConfig_CreateConVar("onlyhs_oneshot", "0", "Enable / Disable kill enemy with one shot", _, true, 0.0, true, 1.0);
-	g_hEnableWeapon = AutoExecConfig_CreateConVar("onlyhs_oneweapon", "1", "Enable / Disalbe Only One Weapon Damage", _, true, 0.0, true, 1.0);
-	g_hAllowGrenade = AutoExecConfig_CreateConVar("onlyhs_allow_grenade", "0", "Enable / Disalbe Grenade Damage", _, true, 0.0, true, 1.0);
-	g_hAllowWorld = AutoExecConfig_CreateConVar("onlyhs_allow_world", "0", "Enable / Disalbe World Damage", _, true, 0.0, true, 1.0);
-	g_hAllowMelee = AutoExecConfig_CreateConVar("onlyhs_allow_knife", "0", "Enable / Disalbe Knife Damage", _, true, 0.0, true, 1.0);
-	g_hAllowedWeapon = AutoExecConfig_CreateConVar("onlyhs_allow_weapon", "deagle", "Which weapon should be permitted ( Without 'weapon_' )?");
+	LoadTranslations("common.phrases");
+	
+	g_cEnablePlugin = CreateConVar("onlyhs_enable", "1", "Enable / Disalbe Only HeadShot Plugin", _, true, 0.0, true, 1.0);
+	g_cEnableOneShot = CreateConVar("onlyhs_oneshot", "0", "Enable / Disable kill enemy with one shot", _, true, 0.0, true, 1.0);
+	g_cAllowGrenade = CreateConVar("onlyhs_allow_grenade", "0", "Enable / Disalbe No Grenade Damage", _, true, 0.0, true, 1.0);
+	g_cAllowWorld = CreateConVar("onlyhs_allow_world", "0", "Enable / Disalbe No World Damage", _, true, 0.0, true, 1.0);
+	g_cAllowKnife = CreateConVar("onlyhs_allow_knife", "0", "Enable / Disalbe No Knife Damage", _, true, 0.0, true, 1.0);
+	g_cAllowedWeapons = CreateConVar("onlyhs_allow_weapons", "deagle;elite", "Which weapon should be permitted ( Without 'weapon_' )?");
+	g_cEnableNoBlood = CreateConVar("onlyhs_allow_blood", "0", "Enable / Disable No Blood", _, true, 0.0, true, 1.0);
+	g_cEnableBloodSplatter = CreateConVar("onlyhs_allow_blood_splatter", "0", "Enable / Disable No Blood Splatter", _, true, 0.0, true, 1.0);
+	g_cEnableBloodSplash = CreateConVar("onlyhs_allow_blood_splash", "0", "Enable / Disable No Blood Splash", _, true, 0.0, true, 1.0);
 
-	AutoExecConfig_ExecuteFile();
-	AutoExecConfig_CleanFile();
+	AutoExecConfig();
 
-	for(new i = 1; i <= MaxClients; i++)
+	AddTempEntHook("EffectDispatch", TE_OnEffectDispatch);
+	AddTempEntHook("World Decal", TE_OnWorldDecal);
+
+	for(int i = 1; i <= MaxClients; i++)
 	{
 		if(IsClientValid(i))
 		{
 			SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 		}
 	}
-
-	if (LibraryExists("updater"))
-	{
-		Updater_AddPlugin(UPDATE_URL);
-	}
 }
 
-public OnLibraryAdded(const String:name[])
-{
-	if (StrEqual(name, "updater"))
-	{
-		Updater_AddPlugin(UPDATE_URL);
-	}
-}
-
-public OnClientPutInServer(i)
+public void OnClientPutInServer(int i)
 {
 	SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 }
 
-public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype, &weapon, Float:damageForce[3], Float:damagePosition[3])
+public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if(GetConVarInt(g_hEnablePlugin))
+	if(g_cEnablePlugin.BoolValue)
 	{
 		if(IsClientValid(victim))
 		{
 			if(damagetype & DMG_FALL || attacker == 0)
 			{
-				if(GetConVarInt(g_hAllowWorld))
-				{
+				if(g_cAllowWorld.BoolValue)
 					return Plugin_Continue;
-				}
 				else
-				{
 					return Plugin_Handled;
-				}
 			}
 
 			if(IsClientValid(attacker))
 			{
-				GetEdictClassname(inflictor, g_sGrenade, sizeof(g_sGrenade));
-				GetClientWeapon(attacker, g_sWeapon, sizeof(g_sWeapon));
+				char sGrenade[32];
+				char sWeapon[32];
+				
+				GetEdictClassname(inflictor, sGrenade, sizeof(sGrenade));
+				GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
+				
+				if ((StrContains(sWeapon, "knife", false) != -1) || (StrContains(sWeapon, "bayonet", false) != -1))
+					if(g_cAllowKnife.BoolValue)
+						return Plugin_Continue;
 
-				if(damagetype & DMG_HEADSHOT)
+				if (StrContains(sGrenade, "_projectile", false) != -1)
+					if(g_cAllowGrenade.BoolValue)
+						return Plugin_Continue;
+				
+				char sBuffer[256], sWeapons[24][64];
+				g_cAllowedWeapons.GetString(sBuffer, sizeof(sBuffer));
+				
+				int iCount = ExplodeString(sBuffer, ";", sWeapons, sizeof(sWeapons), sizeof(sWeapons[]));
+
+				for (int i = 0; i < iCount; i++)
 				{
-					if(GetConVarInt(g_hEnableWeapon))
+					if (StrContains(sWeapon[7], sWeapons[i], false) != -1)
 					{
-						GetConVarString(g_hAllowedWeapon, g_sAllowedWeapon, sizeof(g_sAllowedWeapon));
-
-						if(!StrEqual(g_sWeapon[7], g_sAllowedWeapon))
+						if(damagetype & CS_DMG_HEADSHOT)
 						{
-							return Plugin_Handled;
-						}
-					}
-
-					if(GetConVarInt(g_hEnableOneShot))
-					{
-						damage = float(GetClientHealth(victim));
-
-						return Plugin_Changed;
-					}
-
-					return Plugin_Continue;
-				}
-				else
-				{
-					if(GetConVarInt(g_hAllowMelee))
-					{
-						if(StrEqual(g_sWeapon, "weapon_knife"))
-						{
+							if(g_cEnableOneShot.BoolValue)
+							{
+								damage = float(GetClientHealth(victim) + GetClientArmor(victim));
+								return Plugin_Changed;
+							}
+		
 							return Plugin_Continue;
 						}
 					}
-
-					if(GetConVarInt(g_hAllowGrenade))
-					{
-						if(GetEngineVersion() == Engine_CSS)
-						{
-							if(StrEqual(g_sGrenade, "hegrenade_projectile"))
-							{
-								return Plugin_Continue;
-							}
-						}
-						else if(GetEngineVersion() == Engine_CSGO)
-						{
-							if(StrEqual(g_sGrenade, "hegrenade_projectile") || StrEqual(g_sGrenade, "decoy_projectile") || StrEqual(g_sGrenade, "molotov_projectile"))
-							{
-								return Plugin_Continue;
-							}
-						}
-					}
-					return Plugin_Handled;
 				}
 			}
-			else
-			{
-				return Plugin_Handled;
-			}
 		}
-		else
-		{
-			return Plugin_Handled;
-		}
+		return Plugin_Handled;
 	}
-	else
-	{
-		return Plugin_Continue;
-	}
+	return Plugin_Continue;
 }
 
-stock bool:IsClientValid(client)
+public Action TE_OnEffectDispatch(const char[] te_name, const Players[], int numClients, float delay)
+{
+	int iEffectIndex = TE_ReadNum("m_iEffectName");
+	int nHitBox = TE_ReadNum("m_nHitBox");
+	char sEffectName[64];
+
+	GetEffectName(iEffectIndex, sEffectName, sizeof(sEffectName));
+	
+	if(g_cEnableNoBlood.BoolValue)
+	{
+		if(StrEqual(sEffectName, "csblood"))
+		{
+			if(g_cEnableBloodSplatter.BoolValue)
+				return Plugin_Handled;
+		}
+		if(StrEqual(sEffectName, "ParticleEffect"))
+		{
+			if(g_cEnableBloodSplash.BoolValue)
+			{
+				char sParticleEffectName[64];
+				GetParticleEffectName(nHitBox, sParticleEffectName, sizeof(sParticleEffectName));
+				
+				if(StrEqual(sParticleEffectName, "impact_helmet_headshot") || StrEqual(sParticleEffectName, "impact_physics_dust"))
+					return Plugin_Handled;
+			}
+		}
+	}
+
+	return Plugin_Continue;
+}
+
+public Action TE_OnWorldDecal(const char[] te_name, const Players[], int numClients, float delay)
+{
+	float vecOrigin[3];
+	int nIndex = TE_ReadNum("m_nIndex");
+	char sDecalName[64];
+
+	TE_ReadVector("m_vecOrigin", vecOrigin);
+	GetDecalName(nIndex, sDecalName, sizeof(sDecalName));
+	
+	if(g_cEnableNoBlood.BoolValue)
+	{
+		if(StrContains(sDecalName, "decals/blood") == 0 && StrContains(sDecalName, "_subrect") != -1)
+			if(g_cEnableBloodSplash.BoolValue)
+				return Plugin_Handled;
+	}
+
+	return Plugin_Continue;
+}
+
+stock bool IsClientValid(int client)
 {
 	if(client > 0 && client <= MaxClients && IsClientInGame(client))
-	{
 		return true;
-	}
 	return false;
+}
+
+stock int GetParticleEffectName(int index, char[] sEffectName, int maxlen)
+{
+	int table = INVALID_STRING_TABLE;
+	
+	if (table == INVALID_STRING_TABLE)
+		table = FindStringTable("ParticleEffectNames");
+	
+	return ReadStringTable(table, index, sEffectName, maxlen);
+}
+
+stock int GetEffectName(int index, char[] sEffectName, int maxlen)
+{
+	int table = INVALID_STRING_TABLE;
+	
+	if (table == INVALID_STRING_TABLE)
+		table = FindStringTable("EffectDispatch");
+	
+	return ReadStringTable(table, index, sEffectName, maxlen);
+}
+
+stock int GetDecalName(int index, char[] sDecalName, int maxlen)
+{
+	int table = INVALID_STRING_TABLE;
+	
+	if (table == INVALID_STRING_TABLE)
+		table = FindStringTable("decalprecache");
+	
+	return ReadStringTable(table, index, sDecalName, maxlen);
 }
