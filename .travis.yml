@@ -16,7 +16,6 @@ before_script:
   
 script:
   - ./spcomp onlyhs.sp
-  - ./spcomp onlyhs-beta.sp
 
 notifications:
   email: 
