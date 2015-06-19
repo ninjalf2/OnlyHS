@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define ONLYHS_VERSION "2.0.0"
+#define ONLYHS_VERSION "2.0.1"
 
 ConVar g_cEnablePlugin = null;
 ConVar g_cEnableOneShot = null;
@@ -74,7 +74,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 	{
 		if(IsClientValid(victim))
 		{
-			if(damagetype & DMG_FALL || attacker == 0)
+			if(damagetype & DMG_FALL || damagetype & DMG_GENERIC || attacker == 0)
 			{
 				if(g_cAllowWorld.BoolValue)
 					return Plugin_Continue;
