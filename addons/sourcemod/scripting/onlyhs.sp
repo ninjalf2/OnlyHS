@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define ONLYHS_VERSION "2.0.1"
+#define ONLYHS_VERSION "2.0.2"
 
 ConVar g_cEnablePlugin = null;
 ConVar g_cEnableOneShot = null;
@@ -74,7 +74,29 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 	{
 		if(IsClientValid(victim))
 		{
-			if(damagetype & DMG_FALL || damagetype & DMG_GENERIC || attacker == 0)
+			if(
+				damagetype == DMG_FALL
+				|| damagetype == DMG_GENERIC
+				|| damagetype == DMG_CRUSH
+				|| damagetype == DMG_SLASH
+				|| damagetype == DMG_BURN
+				|| damagetype == DMG_VEHICLE
+				|| damagetype == DMG_FALL
+				|| damagetype == DMG_BLAST
+				|| damagetype == DMG_SHOCK
+				|| damagetype == DMG_SONIC
+				|| damagetype == DMG_ENERGYBEAM
+				|| damagetype == DMG_DROWN
+				|| damagetype == DMG_PARALYZE
+				|| damagetype == DMG_NERVEGAS
+				|| damagetype == DMG_POISON
+				|| damagetype == DMG_ACID
+				|| damagetype == DMG_AIRBOAT
+				|| damagetype == DMG_PLASMA
+				|| damagetype == DMG_RADIATION
+				|| damagetype == DMG_SLOWBURN
+				|| attacker == 0
+			)
 			{
 				if(g_cAllowWorld.BoolValue)
 					return Plugin_Continue;
@@ -98,7 +120,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					if(g_cAllowGrenade.BoolValue)
 						return Plugin_Continue;
 				
-				char sBuffer[256], sWeapons[24][64];
+				char sBuffer[256], sWeapons[32][64];
 				g_cAllowedWeapons.GetString(sBuffer, sizeof(sBuffer));
 				
 				int iCount = ExplodeString(sBuffer, ";", sWeapons, sizeof(sWeapons), sizeof(sWeapons[]));
