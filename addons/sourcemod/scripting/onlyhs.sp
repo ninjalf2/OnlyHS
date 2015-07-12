@@ -14,16 +14,12 @@ ConVar g_cEnableOneShot = null;
 ConVar g_cAllowGrenade = null;
 ConVar g_cAllowWorld = null;
 ConVar g_cAllowKnife = null;
-ConVar g_cAllowedWeapons = null;
-ConVar g_cEnableBloodSplatter = null;
-ConVar g_cEnableBloodSplash = null;
-ConVar g_cEnableNoBlood = null;
 
-public Plugin myinfo = 
+public Plugin myinfo =
 {
-	name = "Only Headshot",
-	author = "Bara",
-	description = "Only Headshot Plugin for CSS and CSGO",
+	name = "Only Headshot [modified]",
+	author = "Bara [modified by ninjalf2]",
+	description = "[Modified] Only Headshot Plugin for CSS and CSGO",
 	version = ONLYHS_VERSION,
 	url = "www.bara.in"
 }
@@ -38,21 +34,14 @@ public void OnPluginStart()
 	CreateConVar("onlyhs_version", ONLYHS_VERSION, "Only Headshot", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
 	LoadTranslations("common.phrases");
-	
+
 	g_cEnablePlugin = CreateConVar("onlyhs_enable", "1", "Enable / Disalbe Only HeadShot Plugin", _, true, 0.0, true, 1.0);
 	g_cEnableOneShot = CreateConVar("onlyhs_oneshot", "0", "Enable / Disable kill enemy with one shot", _, true, 0.0, true, 1.0);
 	g_cAllowGrenade = CreateConVar("onlyhs_allow_grenade", "0", "Enable / Disalbe No Grenade Damage", _, true, 0.0, true, 1.0);
 	g_cAllowWorld = CreateConVar("onlyhs_allow_world", "0", "Enable / Disalbe No World Damage", _, true, 0.0, true, 1.0);
 	g_cAllowKnife = CreateConVar("onlyhs_allow_knife", "0", "Enable / Disalbe No Knife Damage", _, true, 0.0, true, 1.0);
-	g_cAllowedWeapons = CreateConVar("onlyhs_allow_weapons", "deagle;elite", "Which weapon should be permitted ( Without 'weapon_' )?");
-	g_cEnableNoBlood = CreateConVar("onlyhs_allow_blood", "0", "Enable / Disable No Blood", _, true, 0.0, true, 1.0);
-	g_cEnableBloodSplatter = CreateConVar("onlyhs_allow_blood_splatter", "0", "Enable / Disable No Blood Splatter", _, true, 0.0, true, 1.0);
-	g_cEnableBloodSplash = CreateConVar("onlyhs_allow_blood_splash", "0", "Enable / Disable No Blood Splash", _, true, 0.0, true, 1.0);
 
 	AutoExecConfig();
-
-	AddTempEntHook("EffectDispatch", TE_OnEffectDispatch);
-	AddTempEntHook("World Decal", TE_OnWorldDecal);
 
 	for(int i = 1; i <= MaxClients; i++)
 	{
@@ -108,10 +97,10 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			{
 				char sGrenade[32];
 				char sWeapon[32];
-				
+
 				GetEdictClassname(inflictor, sGrenade, sizeof(sGrenade));
 				GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
-				
+
 				if ((StrContains(sWeapon, "knife", false) != -1) || (StrContains(sWeapon, "bayonet", false) != -1))
 					if(g_cAllowKnife.BoolValue)
 						return Plugin_Continue;
@@ -119,27 +108,15 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				if (StrContains(sGrenade, "_projectile", false) != -1)
 					if(g_cAllowGrenade.BoolValue)
 						return Plugin_Continue;
-				
-				char sBuffer[256], sWeapons[32][64];
-				g_cAllowedWeapons.GetString(sBuffer, sizeof(sBuffer));
-				
-				int iCount = ExplodeString(sBuffer, ";", sWeapons, sizeof(sWeapons), sizeof(sWeapons[]));
 
-				for (int i = 0; i < iCount; i++)
+				if(damagetype & CS_DMG_HEADSHOT)
 				{
-					if (StrContains(sWeapon[7], sWeapons[i], false) != -1)
+					if(g_cEnableOneShot.BoolValue)
 					{
-						if(damagetype & CS_DMG_HEADSHOT)
-						{
-							if(g_cEnableOneShot.BoolValue)
-							{
-								damage = float(GetClientHealth(victim) + GetClientArmor(victim));
-								return Plugin_Changed;
-							}
-		
-							return Plugin_Continue;
-						}
+						damage = float(GetClientHealth(victim) + GetClientArmor(victim));
+						return Plugin_Changed;
 					}
+					return Plugin_Continue;
 				}
 			}
 		}
@@ -148,89 +125,9 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 	return Plugin_Continue;
 }
 
-public Action TE_OnEffectDispatch(const char[] te_name, const Players[], int numClients, float delay)
-{
-	int iEffectIndex = TE_ReadNum("m_iEffectName");
-	int nHitBox = TE_ReadNum("m_nHitBox");
-	char sEffectName[64];
-
-	GetEffectName(iEffectIndex, sEffectName, sizeof(sEffectName));
-	
-	if(g_cEnableNoBlood.BoolValue)
-	{
-		if(StrEqual(sEffectName, "csblood"))
-		{
-			if(g_cEnableBloodSplatter.BoolValue)
-				return Plugin_Handled;
-		}
-		if(StrEqual(sEffectName, "ParticleEffect"))
-		{
-			if(g_cEnableBloodSplash.BoolValue)
-			{
-				char sParticleEffectName[64];
-				GetParticleEffectName(nHitBox, sParticleEffectName, sizeof(sParticleEffectName));
-				
-				if(StrEqual(sParticleEffectName, "impact_helmet_headshot") || StrEqual(sParticleEffectName, "impact_physics_dust"))
-					return Plugin_Handled;
-			}
-		}
-	}
-
-	return Plugin_Continue;
-}
-
-public Action TE_OnWorldDecal(const char[] te_name, const Players[], int numClients, float delay)
-{
-	float vecOrigin[3];
-	int nIndex = TE_ReadNum("m_nIndex");
-	char sDecalName[64];
-
-	TE_ReadVector("m_vecOrigin", vecOrigin);
-	GetDecalName(nIndex, sDecalName, sizeof(sDecalName));
-	
-	if(g_cEnableNoBlood.BoolValue)
-	{
-		if(StrContains(sDecalName, "decals/blood") == 0 && StrContains(sDecalName, "_subrect") != -1)
-			if(g_cEnableBloodSplash.BoolValue)
-				return Plugin_Handled;
-	}
-
-	return Plugin_Continue;
-}
-
 stock bool IsClientValid(int client)
 {
 	if(client > 0 && client <= MaxClients && IsClientInGame(client))
 		return true;
 	return false;
-}
-
-stock int GetParticleEffectName(int index, char[] sEffectName, int maxlen)
-{
-	int table = INVALID_STRING_TABLE;
-	
-	if (table == INVALID_STRING_TABLE)
-		table = FindStringTable("ParticleEffectNames");
-	
-	return ReadStringTable(table, index, sEffectName, maxlen);
-}
-
-stock int GetEffectName(int index, char[] sEffectName, int maxlen)
-{
-	int table = INVALID_STRING_TABLE;
-	
-	if (table == INVALID_STRING_TABLE)
-		table = FindStringTable("EffectDispatch");
-	
-	return ReadStringTable(table, index, sEffectName, maxlen);
-}
-
-stock int GetDecalName(int index, char[] sDecalName, int maxlen)
-{
-	int table = INVALID_STRING_TABLE;
-	
-	if (table == INVALID_STRING_TABLE)
-		table = FindStringTable("decalprecache");
-	
-	return ReadStringTable(table, index, sDecalName, maxlen);
 }
